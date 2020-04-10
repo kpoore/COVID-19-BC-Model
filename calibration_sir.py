@@ -7,6 +7,7 @@ import pickle
 import pandas as pd
 
 # t_data = np.linspace(0,48,49)
+# collect data from CSV file
 cd_data = pd.read_csv('bc_covid.csv')
 data_rows, data_cols = cd_data.shape
 t_data = np.linspace(0, data_rows-1, data_rows)
@@ -14,12 +15,22 @@ inf_data = cd_data['Infected']
 reco_data = cd_data['Recovered']
 
 def sir(y, t, param):
-    phi = tanh(0.0, param[1], t, 43)
+    '''
+    Basic SIR model with a compartment for infected and unaware (asymptomatic)
+    and a compartment for aware (symptomatic).
+    Parameters include transmission rate, beta, social distancing factor, rho,
+    transition rate from unaware to aware, nu, and recovery rate, gamma.
+    A rate of 0.8% death rate is assumed as it matches local data.
+    A sigmoid function is used for the social distancing rate as a way
+    to "ramp up" social distancing in a matter of days without breaking
+    the ODE.
+    '''
+    phi = tanh(0.0, param[1], t, 46)
     ds = -param[0]*(1-phi)*y[0]*(y[1] + y[2])
     #S = -b(1-p)s(iu+ia)
     diu = param[0]*(1-phi)*y[0]*(y[1] + y[2]) - param[2] * y[1]
     #Iu = -b(1-p)s(iu+ia) - niu
-    dia = param[2] * y[1] - param[3]*y[2] - .03*y[2]
+    dia = param[2] * y[1] - param[3]*y[2] - .008*y[2]
     #Ia = nIu - gIa - mIa
     dr = param[3]*y[2]
     #R = gIa
@@ -27,23 +38,32 @@ def sir(y, t, param):
 
 def tanh(y0, ym, t, tm):
     '''
-    Sigmoid function that starts at 0 and plateaus at ym.
-    The half way point between 0 and ym will be achieved at tm.
+    Sigmoid function that starts at y0 and plateaus at ym.
+    The half way point between y0 and ym will be achieved at tm.
     '''
     return (ym - y0)*(np.tanh(2. * ((t -tm))/tm) + 1) / 2. + y0
 
 def sir_integrate(x, y0, p):
+    '''
+    A function to run the integration.
+    '''
     yn = integrate.odeint(sir, y0, x, args=(p))
     return yn
 
 
 def ls_opt(x, fit_p):
+    '''
+    Least Squares fitting for infectious cases
+    '''
     f = lambda y,t: sir(y, t, fit_p)
     r = integrate.odeint(f, y0, x)
     # print('{}'.format(r))
     return r[:,2]
 
 def ls_opt_p(x, fit_p):
+    '''
+    Least Squares fitting for infectious and recovered cases.
+    '''
     f = lambda y,t: sir(y, t, fit_p)
     r = integrate.odeint(f, y0, x)
     # print('{}'.format(r))
@@ -51,12 +71,15 @@ def ls_opt_p(x, fit_p):
 
 def f_resid(p):
     inf, rec = ls_opt_p(t_data, p)
-    return np.sqrt((inf_data - inf)**2 + (reco_data - rec)**2)
+    '''
+    Calculate residuals to measure the fitness of the parameters
+    '''
+    return inf_data - inf + reco_data - rec
 
 if __name__ == "__main__":
     
     # Guess parameters
-    param_g = [1.949*10**-7, 0.6,  5.4/365., 21.5/365.]
+    param_g = [.5126*10**-7, 0.96,  5.4/365., 21.5/365.]
     y0 = [5071336, 0, 1, 0]
     res = optimize.least_squares(f_resid, param_g, bounds=(0, [.1, 1., 0.1, 0.1]))
     # c = optimize.least_squares(f_resid, param_g, bounds=(0, [0.05, 0.6]))
