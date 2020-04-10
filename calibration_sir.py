@@ -10,18 +10,27 @@ import pandas as pd
 cd_data = pd.read_csv('bc_covid.csv')
 data_rows, data_cols = cd_data.shape
 t_data = np.linspace(0, data_rows-1, data_rows)
-inf_data = cd_data['Cases']
+inf_data = cd_data['Infected']
 reco_data = cd_data['Recovered']
 
 def sir(y, t, param):
-    ds = -param[0]*(1-0.5)*y[0]*y[1]
-    #s = -b(1-d)si
-    di = param[0]*(1-0.5)*y[0]*y[1] - param[1]*y[1] - .03*y[1]
-    #I = b(1-d)si - gI - mI
-    dr = param[1]*y[1]
-    #R = gI
-    return [ds, di, dr]
+    phi = tanh(0.0, param[1], t, 43)
+    ds = -param[0]*(1-phi)*y[0]*(y[1] + y[2])
+    #S = -b(1-p)s(iu+ia)
+    diu = param[0]*(1-phi)*y[0]*(y[1] + y[2]) - param[2] * y[1]
+    #Iu = -b(1-p)s(iu+ia) - niu
+    dia = param[2] * y[1] - param[3]*y[2] - .03*y[2]
+    #Ia = nIu - gIa - mIa
+    dr = param[3]*y[2]
+    #R = gIa
+    return [ds, diu, dia, dr]
 
+def tanh(y0, ym, t, tm):
+    '''
+    Sigmoid function that starts at 0 and plateaus at ym.
+    The half way point between 0 and ym will be achieved at tm.
+    '''
+    return (ym - y0)*(np.tanh(2. * ((t -tm))/tm) + 1) / 2. + y0
 
 def sir_integrate(x, y0, p):
     yn = integrate.odeint(sir, y0, x, args=(p))
@@ -32,13 +41,13 @@ def ls_opt(x, fit_p):
     f = lambda y,t: sir(y, t, fit_p)
     r = integrate.odeint(f, y0, x)
     # print('{}'.format(r))
-    return r[:,1]
+    return r[:,2]
 
 def ls_opt_p(x, fit_p):
     f = lambda y,t: sir(y, t, fit_p)
     r = integrate.odeint(f, y0, x)
     # print('{}'.format(r))
-    return [r[:,1], r[:,2]]
+    return [r[:,2], r[:,3]]
 
 def f_resid(p):
     inf, rec = ls_opt_p(t_data, p)
@@ -47,9 +56,9 @@ def f_resid(p):
 if __name__ == "__main__":
     
     # Guess parameters
-    param_g = [3.3507*10**-8, 0.0569384]
-    y0 = [5071336, 1, 0]
-    res = optimize.least_squares(f_resid, param_g, bounds=(0, [.1, .6]))
+    param_g = [1.949*10**-7, 0.6,  5.4/365., 21.5/365.]
+    y0 = [5071336, 0, 1, 0]
+    res = optimize.least_squares(f_resid, param_g, bounds=(0, [.1, 1., 0.1, 0.1]))
     # c = optimize.least_squares(f_resid, param_g, bounds=(0, [0.05, 0.6]))
     # (c,kvg) = optimize.curve_fit(f_resid, t_data, inf_data, p0=3.4*10**-4, bounds=([0,0,0], [1, 1, 1]))
     # (c,kvg) = optimize.curve_fit(f_resid, t_data, inf_data, p0=2.5*10**-8)
