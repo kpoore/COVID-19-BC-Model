@@ -1,19 +1,27 @@
-import simple_BC_model as sir
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import pickle
 from scipy.integrate import odeint
+import math
 
-def sir(y, t, beta, gamma):
-    ds = -beta*(1-0)*y[0]*y[1]
+def sir(y, t, beta, gamma, rho):
+    phi = tanh(rho, t, 43)
+    ds = -beta*(1-phi)*y[0]*y[1]
     #s = -b(1-d)si
-    di = beta*(1-0)*y[0]*y[1] - gamma*y[1] - 0.03*y[1]
+    di = beta*(1-phi)*y[0]*y[1] - gamma*y[1] - 0.03*y[1]
     #I = b(1-d)si - gI - mI
     dr = gamma*y[1]
     #R = gI
     dd = 0.03*y[1]
     return [ds, di, dr, dd]
+
+def tanh(ym, t, tm):
+    '''
+    Sigmoid function that starts at 0 and plateaus at ym.
+    The half way point between 0 and ym will be achieved at tm.
+    '''
+    return ym*(np.tanh(2. * ((t -tm))/tm) + 1) / 2.
 
 
 if __name__ == "__main__":
