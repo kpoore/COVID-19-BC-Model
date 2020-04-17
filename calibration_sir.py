@@ -28,9 +28,9 @@ def sir(y, t, param):
     phi = tanh(0.0, param[1], t, 46)
     ds = -param[0]*(1-phi)*y[0]*(y[1] + y[2])
     #S = -b(1-p)s(iu+ia)
-    diu = param[0]*(1-phi)*y[0]*(y[1] + y[2]) - param[2] * y[1]
+    diu = param[0]*(1-phi)*y[0]*(y[1] + y[2]) - 6/365. * y[1]
     #Iu = -b(1-p)s(iu+ia) - niu
-    dia = param[2] * y[1] - param[3]*y[2] - .008*y[2]
+    dia = 6/365. * y[1] - param[3]*y[2] - .008*y[2]
     #Ia = nIu - gIa - mIa
     dr = param[3]*y[2]
     #R = gIa
@@ -74,14 +74,16 @@ def f_resid(p):
     '''
     Calculate residuals to measure the fitness of the parameters
     '''
-    return inf_data - inf + reco_data - rec
+    return (inf_data - inf)**2 + (reco_data - rec)
 
 if __name__ == "__main__":
     
     # Guess parameters
-    param_g = [.5126*10**-7, 0.96,  5.4/365., 21.5/365.]
+    param_g = [2.64401407e-08, 9.900000e-01,  6/365., 8.21917808e-02]
     y0 = [5071336, 0, 1, 0]
-    res = optimize.least_squares(f_resid, param_g, bounds=(0, [.1, 1., 0.1, 0.1]))
+    res = optimize.least_squares(f_resid, param_g, bounds=([0, 0, 1/365., 5/365. ],
+                                [.1, .9999, 19/365., 30/365.]), ftol=10**-9,
+                                method='trf')
     # c = optimize.least_squares(f_resid, param_g, bounds=(0, [0.05, 0.6]))
     # (c,kvg) = optimize.curve_fit(f_resid, t_data, inf_data, p0=3.4*10**-4, bounds=([0,0,0], [1, 1, 1]))
     # (c,kvg) = optimize.curve_fit(f_resid, t_data, inf_data, p0=2.5*10**-8)
